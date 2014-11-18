@@ -6,8 +6,124 @@ Lesson 6: Boot and the Filesystem Hierarchy
     - basics of kernel and differences between virtualization/physical (the
       picture that kevin draws)
 
+Before we begin
+---------------
+
+|
+
+::
+
+    $ sudo yum install man man-pages man-pages-overrides
+    $ man hier # a massive man page explaining the filesystem hierarchy
+
+::
+
+    $ echo $PATH
+    /usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin:\
+    /home/vagrant/bin
+
+``$PATH`` is used as a colon-delimited list of places to
+look for binaries by your shell
+
+::
+
+    $ which pwd
+    /bin/pwd
+
+The ``which`` command tells you which binary it is running for a given name.
+
+Before we begin
+---------------
+
+* File := Device in the context of a file system
+* You can view a files information with any of the following commands::
+
+    $ ls -l $file #
+    $ file $file # will state long name of file type
+    $ stat $file
+
+Permission Bits
+---------------
+
+All files have 2 entry bytes and 12 permission bits:
+
+* 2 entry bytes for type:
+
+  * one of: regular, block, character, dir, link, fifo, socket, or whiteout
+
+* 3 permission bits for user
+
+  * read, write, execute
+
+* 3 permission bits for group
+
+  * read, write, execute
+
+* 3 permission bits for everyone
+
+  * read, write, execute
+
+* 3 permission bits for special things:
+
+  * sticky, setgid, setuid
+
+Permission Bits
+---------------
+
+::
+
+    ls -la /home
+    drwxr-xr-x.  3 root    root    4096 Oct 29 16:06 .
+    dr-xr-xr-x. 23 root    root    4096 Nov 13 20:21 ..
+    drwx------.  3 vagrant vagrant 4096 Nov 13 21:53 vagrant
+
+* First ten chars are permission bits, first ``-`` means regular file
+* Every other ``-`` means either read, write, execute bit not set
+* First three ``rwx`` is for user, then group, then other
+* Change permissions with ``chmod``
+
+Permissions (Octal)
+-------------------
+
+* 2 bytes for entry type
+
+* 1 byte each for:
+
+  * special, user, group, others
+
+.. csv-table:: Permissions (Octal)
+   :header: Category,Execute,Read,Write
+
+   Special,1000 (sticky),2000 (setgid),4000 (setuid)
+   User,0100,0200,0400
+   Group,0010,0020,0040
+   Other,0001,0002,0004
+
+* Sum the 4 bytes to get total permissions, summing is bijective:
+
+Permissions Example (Octal)
+---------------------------
+
+.. csv-table:: **1775**
+   :header: Category,Execute,Read,Write
+
+   Special,set (sticky), not set, not set
+   User,set,set,set
+   Group,set,set,set
+   Other,set,not set,set
+
+.. csv-table:: **0644**
+   :header: Category,Execute,Read,Write
+
+   Special,not set,not set,not set
+   User,not set,set,set
+   Group,not set,not set,set
+   Other,not set,not set,set
+
 The Linux Filesystem Hierarchy
 ------------------------------
+
+|
 
 .. note:: Based on Wade's talk
     https://github.com/clinew/presentation_filesystems/blob/master/presentation.tex
@@ -24,13 +140,18 @@ What's a filesystem?
 Filesystem can mean:
 --------------------
 
+|
+
 - **How the system's files are arranged on the disk**
 - How the disk actually holds the files
 
   - FAT and NTFS are old but Windows-compatible
-  - ext3 is standard, ext4 is newer, xfs has fancier journaling
+  - ext4 is standard, ext3 is older, xfs is being used less
 
     - journaling tracks changes before write
+
+  - ZFS is awesome, but has meh Linux support (but getting better)
+  - btrfs is similar to ZFS, but less mature
   - sysadmins will encounter NFS and its competitors like Gluster
 
 .. note::
@@ -44,6 +165,7 @@ Filesystem can mean:
 
 The File System
 ---------------
+
 |
 
 .. figure:: static/you_are_here.jpg
@@ -52,34 +174,179 @@ The File System
 
 .. code-block:: bash
 
-    $ ls
-    bin   etc         initrd.img.old  lost+found  opt   run      srv  usr
-    boot  home        lib             media       proc  sbin     sys  var
-    dev   initrd.img  lib64           mnt         root  selinux  tmp  vmlinuz
+    $ ls /
+    bin   dev  home  lib64       media  opt   root  selinux  sys  usr      var
+    boot  etc  lib   lost+found  mnt    proc  sbin  srv      tmp  vagrant
 
+\/bin & \/sbin
+--------------
 
-Installed programs and utilities
---------------------------------
+|
 
-.. code-block:: bash
+* Store binaries that are used to boot system and mount other fileystems
+* binaries for all users in ``/bin``, binaries used by root are in ``/sbin``
+* Things like ``mount``, ``echo``, ``chmod``, ``hostname``
 
-    /bin                /usr/sbin
-    /sbin               /usr/local/bin
-    /usr/bin            /usr/local/sbin
+\/usr (Historical Context)
+--------------------------
 
-* ``PATH`` environment variable
+* People were running out of disk space so:
 
-.. code-block:: bash
+  * All binaries not required for base system + booting + mounting other devices went in /usr/bin and /usr/sbin
+  * These binaries were typically manually compiled and installed by the user
+  * Eventually some unices (linux didn't exist yet) took over 
+    /usr/bin and /usr/sbin for the location that packages 
+    were installed to.
+  * Now manually installed (without package manager) binaries go in
+    ``/usr/local/bin`` and ``/usr/local/sbin``.
 
-    $ echo $PATH
-    /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+\/usr (Modern Context)
+----------------------
 
-* ``which`` command
+::
 
-.. code-block:: bash
+    ls /usr
+    bin  etc  games  include  lib  lib64  libexec  local  sbin  share src
 
-    $ which bash
-    /bin/bash
+.. csv-table::
+   :header: Location, Description
+
+   /usr/bin,Packages installed by package manager
+   /usr/sbin,Packages installed by package manager
+   /usr/etc,Rarely used; files from /etc can be symlinked here
+   /usr/games,Binaries for games and educational programs
+
+\/usr (Modern Context)
+----------------------
+
+.. csv-table::
+   :header: Location, Description
+
+   /usr/include,Include files for the C compiler
+   /usr/lib,Object libraries (including dynamic libs); some unusual binaries
+   /usr/lib64,64-bit libraries
+   /usr/libexec,Executables used with libraries; not used much
+   /usr/local,Programs (and their configuration) locally installed by user go here
+
+\/usr (Modern Context)
+----------------------
+
+.. csv-table::
+   :header: Location, Description
+
+   /usr/share,Application data; typically examples and documentation
+   /usr/src/linux,Kernel source goes here
+
+\/dev
+-----
+
+* Device files, which often refer to physical devices
+
+  * ``/dev/sd?``
+  * ``/dev/sr?``
+  * ``/dev/tty*``
+
+* Special character devices:
+
+  * ``/dev/null`` -- sink for writes
+  * ``/dev/random`` -- high quality randomness (blocking)
+  * ``/dev/urandom`` -- non-blocking random
+  * ``/dev/zero`` -- always reads 0s
+
+\/etc
+-----
+
+|
+
+* Configuration files local to the machine
+* Programs almost always look here for configuration first
+
+\/home
+------
+
+|
+
+* Contains homedirs of regular users
+* Sometimes symlinked to ``/usr/home``, but rarely on linux
+
+\/lib & \/lib64
+---------------
+
+|
+
+* Libraries needed to boot and run commands related to bootstrapping
+
+\/media & \/mnt
+---------------
+
+|
+
+* Used as mount points for other devices (usb sticks, nfs, etc)
+* Most Desktop Environments automatically mount things to ``/media``
+
+\/proc
+------
+
+|
+
+* Special filesystem ``procfs`` contains a file-representation of
+  the current state of the kernel and running processes.
+
+\/sys
+-----
+
+|
+
+* File-representation of device drivers, subsystems, and hardware
+  loaded into the kernel
+* Similar to ``sysctl`` on other Unixy systems
+
+\/var
+-----
+
+|
+
+* Multi-purpose: log, temporary, transient, and spool files
+* Typically contains run-time data
+* Cache
+
+Devices
+-------
+
+.. csv-table:: Types of Devices
+   :header: Type,Letter,Description
+
+   Block,b,Used to interact with devices; programs can skip around and read different chunks. Example: ``/dev/sda``
+   Character,c,Unbuffered direct access to a device; Example: ``/dev/zero``
+
+Devices
+-------
+
+.. csv-table:: Types of Devices
+   :header: Type,Letter,Description
+
+   Pseudo,None Used,Devices that don't correspond to a physical device; Pseudo devices are also either a Block or Character device; example: ``/dev/null`` (pseudo + character)
+   Directory,d,Contains other files/devices; example: ``/``
+
+Devices
+-------
+
+.. csv-table::
+   :header: Type,Letter,Description
+
+   Symbolic Link,l,Points to another device by name; example: ``/usr/tmp`` which points to ``/var/tmp`` (use ``ls -l`` to find where a link points)
+   FIFO/LIFO,p,First in First out; Last in First out; example: ``/var/spool/postfix/public/pickup``
+
+Devices
+-------
+
+.. csv-table::
+   :header: Type,Letter,Description
+
+   Regular File,\-,Exactly what you are used to
+   Whiteout,w,A special device used in some Unices (not Linux) for unioned filesystems
+   Socket,s,Communication point (inter-process communication; networking; etc)   
+   
 
 User-Specific Data & Configuration
 ----------------------------------
@@ -93,28 +360,6 @@ User-Specific Data & Configuration
     * Usually not an issue.
     * If your desktop provides backups of deleted files, they'll be somewhere
       in ``/home/<username>/``
-
-
-Where are drives mounted?
-----------------------------
-
-* Raw device appears under ``/dev``.
-
-.. code-block:: bash
-
-    $ dmesg | tail
-    [260930.208715]  sdb: sdb1
-    [260930.320756] sd 6:0:0:0: >[sdb] Asking for cache data failed
-    [260930.320765] sd 6:0:0:0: >[sdb] Assuming drive cache: write through
-    [260930.320771] sd 6:0:0:0: >[sdb] Attached SCSI removable disk
-
-* USB filesystem under ``/media``, main disk ``/``
-* You can manually mount devices with ``mount``
-    * "Everything's a file"
-    * ``umount`` to unmount
-
-* ``/etc/fstab`` tells things where to mount
-* ``/etc/mtab`` shows where things are currently mounted
 
 Space on drives
 ---------------
@@ -135,77 +380,6 @@ Space on drives
     21G /home/
 
 * Default output is in bytes, ``-h`` for human-readable output.
-
-Three Tiers of Filesystem Hierarchy
------------------------------------
-
-* /, essential for system booting and mounting /usr.
-* /usr, read-only system data for normal system operation.
-* /usr/local, locally-installed software.
-    * Package managers usually install under / and /usr.
-
-.. figure:: /static/hierarchy.jpg
-    :align: center
-    :scale: 60%
-
-Common Directories
-------------------
-
-=========  =============================================
-Directory  Contents
-=========  =============================================
-/bin       Binary files
-/include   Header files for C/C++ programs
-/lib       Libraries
-/sbin      Binary files for root (superuser)
-/boot      Files essential for booting kernel, initramfs
-/dev       Virtual filesystem, exports hardware devices
-/etc       System-wide configurations
-/home      Individual users' data
-/media     Removable storage devices
-/mnt       Like media -- place to mount disks and things
-=========  =============================================
-
-Common Directories
-------------------
-
-==========  ===========================================
-Directory   Contents
-==========  ===========================================
-/opt        "Add-on application software packages"
-/proc       Virtual filesystem exporting system data
-/root       homedir for root
-/run        Volatile information accumulated since boot
-/sys        Virtual filesystem exporting kernel objects
-/tmp        Temporary files
-/var        Data which varies -- logs, mail, etc.
-/usr/share  Architecture-independent, read-only data
-/usr/src    Kernel source code
-==========  ===========================================
-
-/proc has lots of useful system information
--------------------------------------------
-
-Which Linux kernel version are you running?
-
-.. code-block:: bash
-
-    $ cat /proc/version
-    Linux version 3.5.0-17-generic (buildd@allspice) (gcc version 4.7.2
-    (Ubuntu/Linaro 4.7.2-2ubuntu1) ) #28-Ubuntu SMP Tue Oct 9 19:31:23 UTC 2012
-
-Learn about system's hardware
-
-.. code-block:: bash
-
-    $ less /proc/cpuinfo
-    $ less /proc/meminfo
-
-Some parts of /proc can be written as well as read...
-
-.. code-block:: bash
-
-    $ echo 3 > /proc/sys/vm/drop_caches # drop caches
 
 Commands for working with filesystems
 -------------------------------------
@@ -231,15 +405,14 @@ Loopback devices
 
     $ losetup
     $ /dev/loop*
-    # makes it look like a device instead of a file
 
 devfs
 -----
 
 .. code-block:: bash
 
-    sd*
-    sr*
+    /dev/sd*
+    /dev/sr*
     /dev/null
     /dev/random
     /dev/urandom
@@ -279,333 +452,121 @@ More about Journaling
 - Filesystem consistency tool; protections against system freezes, power
   outages, etc.
 - Replaying the journal.
-- ext3’s three modes of journaling:
+- ext4’s three modes of journaling:
 
   - :journal: Data and metadata to journal.
   - :ordered: Data updates to filesystem, then metadata committed to journal.
   - :writeback: Metadata comitted to journal, possibly before data updates.
 
-The Boot Process
-----------------
-
-* Bootstrapping
-* Steps in the process
-* Boot loaders
-* Startup scripts
-* Boot levels
-
-.. figure:: static/xkcd-fight.png
-    :align: center
-    :scale: 100%
-
-Bootstrapping
--------------
-
-.. note::
-  kernel loaded into memory, initialization tasks, and available to users
-
-  Init
-    * kernel spawns init which is always PID 1
-    * controls the boot process
-    * can be a simple script to a binary
-
-* *Pull itself up by its own bootstraps*
-* Automatic and manual booting
-* Driver Loading
-* Period of vulnerability
-
-  * configuration errors
-  * missing hardware
-  * damaged filesystems
-
-* ``init`` -- **Always Process ID (PID) #1**
-
-  * First process to start
-  * Either a binary or can be a simple script (even a bash shell!)
-
-Steps in boot process
----------------------
-
-.. note::
-  Kernel
-   * 1st stage – bootloader, 2nd, boot the kernel
-   * boot from boot loader
-   * load into memory
-   * located in /boot/ on Linux
-  Hardware config
-   * locate & initialize hardware
-   * print out what it does
-  System processes
-   * init, kswapd, pdflush, etc
-   * init only real process
-   * Others look like processes for scheduling (appear as [kswapd] with ps)
-
-|
-
-.. figure:: static/booting.png
-    :align: right
-    :scale: 70%
-
-#. Kernel initialization
-#. Hardware configuration
-#. System processes
-#. Operator intervention (single-user)
-#. Execution of start-up scripts
-#. Multi-user operation
+- ext4 journaling differs from ext3 because it uses a single-phase
+  checksum transaction, allowing it to be done asynchronously.
 
 Booting
 -------
 
-.. note::
-  On hardware specific to UNIX (i.e. Sun)
-   * firmware knows how to use devices
-   * talk to the network
-   * understand filesystems
-   * all accessible via the commandline
+|
 
-  BIOS smarter than they used to be
-   * Not standardized
-   * Most servers support PXE
+* POST
+* Bootloader
+* Kernel
+* [Ramdisk] -- initrd
+* init
+* Everything else
 
-* PCs vs Proprietary hardware
-
-  * BIOS, UEFI, OpenBoot PROM, etc
-* BIOS
-
-  * **B**\ asic **I**\ nput/**O**\ utput **S**\ ystem
-  * Very simple compared to OpenBoot PROM / UEFI
-  * Select devices to boot from
-  * MBR (first 512 bytes)
-
-* UEFI
-
-  * **U**\ nified **E**\ xtensible **F**\ irmware **I**\ nterface
-  * Successor to BIOS
-  * Flexible pre-OS environment including network booting
-
-Boot Loaders (Grub)
--------------------
-
-.. note::
-  Grub
-   * next generation PC boot loader
-   * no need to “re-run grub” config updates
-   * Grub config
-   * disks are index based from zero
-   * grub install commands
-   * netboot, pretty, serial
-   * device.map, grub.conf
-   * robust with weird disk geometry
-
-* **Gr**\ and **U**\ nified **B**\ ootloader
-* Dynamic fixes during booting
-* Can read the filesystem
-* Index based – ``(hd0,0) = sda1``
-* Grub "version 1" vs. "version 2"
-
-  * Version 2 has more features, but more complicated
-  * Latest Debian, Ubuntu and Fedora use v2
-
-.. code::
-
-  grub> root (hd0,0)    (Specify where your /boot partition resides)
-  grub> setup (hd0)     (Install GRUB in the MBR)
-  grub> quit            (Exit the GRUB shell)
-
-  grub-install
-
-Single User Mode
-----------------
-
-.. note::
-  Show on VM
-   * enter grub, hit ESC, pick kernel, hit “e” for edit
-   * use arrows
-
-  Typically ask for root password
-
-* What is it used for?
-
-.. figure:: static/single-user-mode.png
-    :align: right
-    :scale: 60%
-..
-
-  * Troubleshoot problems
-  * Manual Filesystem Checks
-  * Booting with bare services
-  * Fix boot problems
-  * Add “single” to kernel option
-
-* Solaris/BSD
-
-  * ``boot -s``
-
-Startup Script Tasks
---------------------
-
-.. note::
-  Verbose and print out description of what its doing.
-
-  Old days were to manually adjust scripts, not anymore. Most are configurable now.
+POST
+----
 
 |
 
-.. figure:: static/fsck.jpg
-    :align: center
-    :scale: 75
+* Power On Self Test
+* BIOS
+* Initializes hardware at very low level
 
-* Setting up hostname & timezone
-* Checking disks with fsck
-* Mounting system's disks
-* Configuring network interfaces
-* Starting up daemons & network services
+  * ensures it is accessible
+  * does **not** load drivers
 
-System-V Boot Style
--------------------
+Bootloader
+----------
 
-.. note::
-  * System-V Most common today
-  * Show system changing between different run levels.
-  * Slightly different between Distros
+|
 
-* Linux derived from System-V originally
-* Alternative init systems
+* Responsible for booting the kernel
+* Contained in first 512 bytes (MBR scheme)
+* Can chainload to another bootloader
 
-  * **systemd** - Fedora 15+, Redhat 7+ and Debian* (dependency driven)
-  * **upstart** - Ubuntu, Redhat 6 (event driven, faster boot times)
+Bootloader
+----------
 
-Run levels:
+|
 
-================= =============================
-level 0           sys is completely down (halt)
-level 1 or S      single-user mode
-level 2 through 5 multi-user levels
-level 6           reboot level
-================= =============================
+* Most linux-based systems use GRUB
 
-/etc/inittab
-------------
+  * GRand Unified Bootloader
 
-.. note::
-  Look at inittab
+* LILO (LInux LOader) is an uncommon alternative
+* syslinux, isolinux are often used for usb/cd images
 
-* Tells init what to do on each level
-* Starts ``getty`` (terminals, serial console)
-* Commands to be run or kept running
-* ``inittab`` not used with systemd or upstart
+GRUB
+----
 
-.. code::
+|
 
-  # The default runlevel.
-  id:2:initdefault:
+* Version 2 vs 0.97 (and 0.98)
+* 2 is more complex, but does more
+* 0.97/8 is simple and easy to use
 
-  # What to do in single-user mode.
-  ~~:S:wait:/sbin/sulogin
+GRUB Configuration
+------------------
 
-  # What to do when CTRL-ALT-DEL is pressed.
-  ca:12345:ctrlaltdel:/sbin/shutdown -t1 -a -r now
+|
 
-  # terminals
-  1:2345:respawn:/sbin/getty 38400 tty1
-  T0:23:respawn:/sbin/getty -L ttyS0 9600 vt100
+* CentOS 6 (your VMs) use GRUB 0.97
+* Main configuration is in ``/boot/grub/menu.lst``
+* kernels and initrds live in ``/boot``
+::
+
+    title CentOS 6 (2.6.32-504.el6.x86_64)
+	root (hd0,0)
+	kernel /vmlinuz-2.6.32-504.el6.x86_64 ro root=/dev/mapper/VolGroup-lv_root rd_NO_LUKS LANG=en_US.UTF-8 rd_NO_MD rd_LVM_LV=VolGroup/lv_swap SYSFONT=latarcyrheb-sun16 crashkernel=auto rd_LVM_LV=VolGroup/lv_root  KEYBOARDTYPE=pc KEYTABLE=us rd_NO_DM rhgb quiet
+	initrd /initramfs-2.6.32-504.el6.x86_64.img
+
+GRUB Configuration
+------------------
+
+|
+
+* root -- boot partition
+* kernel -- your linux kernel!
+* initrd -- initial ram disk which is mounted to help you boot
+
+initrd
+------
+
+* Initial Ram Disk
+* Ram disk contains enough to mount ``/``
+* runs ``/init`` on the ramdisk (before mounting the **real** ``/``)
+  , which mounts ``/`` and runs the new init::
+
+     for f in /mount/*.sh; do
+       [ -f "$f" ] && . "$f"
+       [ -d "$NEWROOT/proc" ] && break;
+     done
+     ...
+     exec switch_root "$NEWROOT" "$INIT" $initargs
+
+* mostly necessary if you are using ``lvm``, ``cryptsetup (LUKS)``, or other
+  complex configurations
 
 
-init.d Scripts
---------------
+real init
+---------
 
-.. note::
-  sshd init script
-   * case statement
-   * functions
-   * chkconfig
+|
 
-* One script for one service/daemon
-* Start up services such as sshd, httpd, etc
-* Commands
+* PID 1 (because it is the first thing that runs!)
+* Ancestor to every other process
+* Runs all other startup scripts (networking, etc)
+* Most linuces are settling on ``systemd`` as their init system
 
-  * start, stop, reload, restart
-* sshd init script
-
-.. code-block:: bash
-
-  $ service sshd status
-  openssh-daemon (pid  1186) is running...
-
-  $ service sshd restart
-  Stopping sshd:                                             [  OK  ]
-  Starting sshd:                                             [  OK  ]
-
-Starting services on boot
--------------------------
-
-.. note::
-  Show sshd script
-  show list, adding, removing, enabling, disabling
-
-* rc\ **level**\ .d (rc0.d, rc1.d)
-* S = start, K = stop/kill
-* Numbers to set sequence (S55sshd)
-* chkconfig / update-rc.d
-
-  * Easy way to enable/disable services in RH/Debian
-* Other distributions work differently
-
-.. code-block:: bash
-
-  $ chkconfig --list sshd
-  sshd            0:off 1:off 2:on  3:on  4:on  5:on  6:off
-
-  $ chkconfig sshd off
-
-  $ chkconfig --list sshd
-  sshd            0:off 1:off 2:off 3:off 4:off 5:off 6:off
-
-Configuring init.d Scripts
---------------------------
-
-.. note::
-  show sendmail & network config examples for CentOS
-
-  /etc/defaults seems to be more common between UNIX's
-
-* /etc/sysconfig (RH) or /etc/defaults (Debian)
-* source Bash scripts
-* Daemon arguments
-* Networking settings
-* Other distributions are vastly different
-
-.. code-block:: bash
-
-  $ cat /etc/sysconfig/ntpd
-  # Drop root to id 'ntp:ntp' by default.
-  OPTIONS="-u ntp:ntp -p /var/run/ntpd.pid -g"
-
-Shutting Down
--------------
-
-.. note::
-  Modern systems are less touchy with hard resets, but still need to be
-  careful. Only for emergencies.
-
-  Shutdown -h
-
-* Not Windows, don't reboot to fix issue
-* Can take a long time (i.e. servers)
-* Reboot only to
-
-  * load new kernel
-  * new hardware
-  * system-wide configuration changes
-* ``shutdown``, ``reboot``, ``halt``, ``init``
-* ``wall`` - send system-wide message to all users
-
-.. code-block:: bash
-
-  $ wall hello world
-  Broadcast message from root@devops-bootcamp (pts/0) (Fri Jan 31 00:40:29 2014):
-
-  hello world
-
-Homework
---------
+  * alternatives: systemv, openrc, bsd-style, upstart
+  * your centos 6 VM uses upstart, centos 7 uses systemd
